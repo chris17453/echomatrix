@@ -1,0 +1,8 @@
+config.yaml
+*.js
+*.gz
+*.zip
+*.tar
+*.flort
+*.log
+*.txt

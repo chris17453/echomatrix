@@ -3,11 +3,11 @@
 import openai
 from echomatrix import config
 
-openai.api_key = config.OPENAI_API_KEY
+openai.api_key = config.openai_api_key
 
 def get_gpt_response(text):
     response = openai.ChatCompletion.create(
-        model=config.GPT_MODEL,
+        model=config.gpt_model,
         messages=[
             {"role": "system", "content": "You are an IVR assistant."},
             {"role": "user", "content": text}

@@ -8,7 +8,8 @@ setup(
         'requests',
         'soundfile',
         'openai',
-        'pydub'
+        'pydub',
+        'pyyaml'
     ],
     entry_points={
         'console_scripts': [
