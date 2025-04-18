@@ -1,4 +1,4 @@
-config.yaml
+*.yaml
 *.js
 *.gz
 *.zip
@@ -6,3 +6,6 @@ config.yaml
 *.flort
 *.log
 *.txt
+*.wav
+*.mp4
+junk

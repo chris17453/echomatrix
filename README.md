@@ -16,6 +16,9 @@ Voice-driven AI IVR system using FreePBX, Asterisk, and OpenAI APIs.
 
 ```bash
 pip install -r requirements.txt
+
+## NONE OF THIS1
+
 sudo dnf install mpg123  alsa-utils 
 # you need to install sox. IT might requre a build from scratch and you need a lot of dependencies to get mp3 etcv working.
 
@@ -31,4 +34,30 @@ vi src/sox_sample_test.h
 
 ./configure
 make -s && make install
+```
+
+## PJSUA2 Build/Install
+So you need to build the pjusa2 project.. then compile the python swig stuff...
+```bash
+# clone the repo
+git clone https://github.com/pjsip/pjproject.git
+
+# build the base library
+cd pjproject
+export CFLAGS="-fPIC"
+export CXXFLAGS="-fPIC"
+./configure
+make dep
+make
+
+
+# make the python module (This doent put it in your pipenv)
+cd pjsip-apps/src/swig/python
+make
+make install
+
+
+# install in yourr project
+cd /web/echomatrix
+pipenv run pip install ../pjproject/pjsip-apps/src/swig/python
 ```

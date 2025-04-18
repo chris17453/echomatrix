@@ -9,11 +9,13 @@ setup(
         'soundfile',
         'openai',
         'pydub',
-        'pyyaml'
+        'pyyaml',
+        'pyst'  # For Asterisk AGI
     ],
     entry_points={
         'console_scripts': [
             'echomatrix-agi=echomatrix.agi_handler:main',
+            'echomatrix=echomatrix.cli:main',  # Main CLI entry point
         ],
     },
 )
