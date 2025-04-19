@@ -7,6 +7,7 @@ from .player import AudioPlayer
 
 logger = logging.getLogger(__name__)
 
+
 # Extend Account class to handle callbacks
 class Account(pj.Account):
     def __init__(self,config):
@@ -29,8 +30,11 @@ class Account(pj.Account):
             call_prm.opt.videoCount = 0
             call_prm.opt.flag |= pj.PJSUA_CALL_INCLUDE_DISABLED_MEDIA
             call_prm.statusCode = 200  # OK
-            call.answer(call_prm)
-            logger.info("Call answered with 200 OK")
+            if self.config.auto_answer:
+                call.answer(call_prm)
+                logger.info("Call answered with 200 OK")
+            else:
+                logger.info("Call not answered")
         except Exception as e:
             logger.error(f"Error in onIncomingCall: {e}")
         

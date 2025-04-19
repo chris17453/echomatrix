@@ -83,8 +83,6 @@ class AudioPlayer:
                     
                     # Connect the player to the call audio
                     player.startTransmit(aud_med)
-                    #player.waitForCompletion()
-
                     
                     logger.info(f"Started playing {wav_file_path} to call {call_id}")
                     
