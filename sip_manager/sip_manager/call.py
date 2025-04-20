@@ -120,7 +120,7 @@ class Call(pj.Call):
             self.current_recording_path = output_path
                 
             # Start recording
-            recorder = AudioRecorder.start_recording(self, output_path,self.config.silence_threshold,self.config.silence_duration)
+            recorder = AudioRecorder.start_recording(self, output_path, self.config)
             
             if not recorder:
                 logger.error("Failed to start recording")
