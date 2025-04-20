@@ -10,18 +10,14 @@ audio_recorders = {}
 
 class AudioRecorder:
     @staticmethod
-    def start_recording(call, output_path, silence_threshold=500, silence_duration=2.0):
-        try:
-            output_dir = os.path.dirname(output_path)
-            if output_dir and not os.path.exists(output_dir):
-                os.makedirs(output_dir)
+    def start_recording(call, output_path, silence_threshold=500, silence_duration=1.0):
 
+
+        try:
             call_info = call.getInfo()
             call_id = call_info.callIdString
             logger.info(f"Setting up recording for call {call_id}")
-
             recorder = pj.AudioMediaRecorder()
-            recorder.createRecorder(output_path)
 
             recorder.output_path = output_path
             recorder.last_size = 0
@@ -31,6 +27,7 @@ class AudioRecorder:
             recorder.last_active_time = time.time()
             recorder.silence_detected = False
             recorder.call_ref = call
+            recorder.createRecorder(output_path)
 
             for media in call_info.media:
                 if media.type == pj.PJMEDIA_TYPE_AUDIO and media.status == pj.PJSUA_CALL_MEDIA_ACTIVE:
@@ -42,6 +39,7 @@ class AudioRecorder:
                         break
                     except Exception as e:
                         logger.error(f"Error getting audio media: {e}")
+
 
             audio_recorders[call_id] = recorder
             return recorder
@@ -80,7 +78,6 @@ class AudioRecorder:
         current_time = time.time()
 
         try:
-            # Don't check more than once every 0.5s
             if current_time - recorder.last_check_time < 0.5:
                 return False, 0
             recorder.last_check_time = current_time
@@ -98,25 +95,34 @@ class AudioRecorder:
                 recorder.last_active_time = current_time
 
             if current_size > 10000:
-                AudioRecorder.pause_recording(recorder)
-                #time.sleep(0.2)
+                #AudioRecorder.pause_recording(recorder)
                 rms = AudioRecorder.analyze_pcm_audio_level(recorder.output_path)
-                #else:
-                 #   rms = AudioRecorder.analyze_wav_audio_level(recorder.output_path)
-                logger.info(f"RMS: {rms} for call {call_id}")
+                #AudioRecorder.resume_recording(recorder)
 
-                AudioRecorder.resume_recording(recorder)
+                if not hasattr(recorder, 'volume_history'):
+                    recorder.volume_history = []
+                recorder.volume_history.append(rms)
+                if len(recorder.volume_history) > 10:
+                    recorder.volume_history.pop(0)
 
-                if rms < recorder.silence_threshold:
+                avg_volume = sum(recorder.volume_history) / len(recorder.volume_history)
+
+                logger.info(f"[check_for_silence] RMS: {rms:.2f}, AVG: {avg_volume:.2f}, THRESH: {recorder.silence_threshold}")
+
+                if avg_volume < recorder.silence_threshold:
                     silence_duration = current_time - recorder.last_active_time
+                    logger.info(f"[check_for_silence] SLENCE DETECTED: {silence_duration:.2f}s")
+
                     if silence_duration >= recorder.silence_duration:
+                        logger.info(f"[check_for_silence] SILENT EVENT ACTIVE: {silence_duration:.2f}s")
                         if not recorder.silence_detected:
                             recorder.silence_detected = True
-                            logger.info(f"Silence detected (RMS: {rms}) for call {call_id}")
+                            logger.info(f"BEGIN SILENCE EVENT (AVG RMS: {avg_volume:.2f}) for call {call_id}")
                             if on_silence_callback:
                                 on_silence_callback(call_id, silence_duration)
                         return True, silence_duration
                 else:
+                    logger.info("[check_for_silence] IN SPEACH EVENT")
                     recorder.last_active_time = current_time
                     recorder.silence_detected = False
 
@@ -170,42 +176,6 @@ class AudioRecorder:
         except Exception as e:
             logger.error(f"Error analyzing PCM: {e}")
             return 0
-
-    @staticmethod
-    def analyze_wav_audio_level(file_path, sample_duration=0.5):
-        try:
-            if not os.path.exists(file_path) or os.path.getsize(file_path) < 100:
-                return 0
-
-            with wave.open(file_path, 'rb') as wf:
-                channels = wf.getnchannels()
-                sample_width = wf.getsampwidth()
-                frame_rate = wf.getframerate()
-                n_frames = wf.getnframes()
-
-                frames_to_read = int(frame_rate * sample_duration)
-                frames_to_read = min(frames_to_read, n_frames)
-                wf.setpos(max(0, n_frames - frames_to_read))
-                frames = wf.readframes(frames_to_read)
-
-                if sample_width == 2:
-                    data = np.frombuffer(frames, dtype=np.int16)
-                elif sample_width == 1:
-                    data = np.frombuffer(frames, dtype=np.uint8) - 128
-                elif sample_width == 4:
-                    data = np.frombuffer(frames, dtype=np.int32)
-                else:
-                    return 0
-
-                if channels > 1:
-                    data = data[::channels]
-
-                if len(data) > 0:
-                    rms = np.sqrt(np.mean(np.square(data.astype(np.float32))))
-                    return rms
-        except Exception as e:
-            logger.error(f"Error analyzing audio level: {e}")
-        return 0
 
     @staticmethod
     def stop_recording(call, recorder=None):

@@ -7,11 +7,12 @@ logger = logging.getLogger(__name__)
 from .recorder import audio_recorders
 
 class CustomEndpoint(pj.Endpoint):
-    def __init__(self):
+    def __init__(self,silence_check_interval=100):
         super().__init__()
+        self.silence_check_interval=silence_check_interval
 
     def onTimer(self, prm):
-        self.utilTimerSchedule(100, None) 
+        self.utilTimerSchedule(self.silence_check_interval, None) 
 
         from .recorder import audio_recorders, AudioRecorder
         for call_id in list(audio_recorders.keys()):

@@ -26,7 +26,7 @@ class Call(pj.Call):
             # This state is triggered when the call is established
             
             # Get the WAV file from config
-            wav_file = self.config.wav
+            wav_file = self.config.welcome_message
             self.on_pickup(wav_file)
             
             # Start recording immediately
@@ -35,17 +35,21 @@ class Call(pj.Call):
         # If call is disconnected, clean up
         elif ci.state == pj.PJSIP_INV_STATE_DISCONNECTED:
             logger.info("Call disconnected")
-            # Clean up any audio players for this call
+            # Clean up devices
             if call_id in audio_players:
                 try:
-
-                    del audio_players[call_id]
-
-                    del audio_recorders[call_id]
-                    logger.info(f"Cleaned up audio player for call {call_id}")
+                    if call_id in audio_players:
+                        del audio_players[call_id]
+                        logger.info(f"Cleaned up audio player for call {call_id}")
                 except Exception as e:
                     logger.warning(f"Error cleaning up audio player: {e}")
-                    
+                try:
+                    if call_id in audio_recorders:
+                        del audio_recorders[call_id]
+                        logger.info(f"Cleaned up recorder for call {call_id}")
+                except Exception as e:
+                    logger.warning(f"Error cleaning up recorder: {e}")
+
             if self in self.acc.calls:
                 self.acc.calls.remove(self)
 
@@ -72,11 +76,13 @@ class Call(pj.Call):
         delay = self.config.welcome_delay
         if delay and delay > 0:
             logger.info(f"Waiting {delay}s delay before playing greeting")
-            time.sleep(delay)
+            time.sleep(delay/1000)
         
         # Play greeting - this will block until complete
         logger.info("Playing greeting to call")
         result = self.acc.play_wav_to_call(wav_file, self)
+        
+      #  time.sleep(self.config.welcome_message_length/1000)
         logger.info(f"Done with greeting ")
     
     def start_recording(self, call_id=None):
@@ -97,19 +103,24 @@ class Call(pj.Call):
             timestamp = time.strftime("%Y%m%d-%H%M%S")
             output_dir = self.config.recording_dir if hasattr(self.config, 'recording_dir') else "recordings"
             
-            # Create directory if it doesn't exist
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
+            try:
+                os.makedirs(output_dir, exist_ok=True)
+                logger.info(f"Created directory: {output_dir}")
+            except Exception as e:
+                logger.error(f"Failed to create directory {output_dir}: {e}")
+                return None
 
+            # it needs to always be PCM
             if self.config.audio_format=='pcm':
                 ext='pcm'
             else:
                 ext='wav'
+
             output_path = os.path.join(output_dir, f"{timestamp}_{call_id}.{ext}")
             self.current_recording_path = output_path
                 
             # Start recording
-            recorder = AudioRecorder.start_recording(self, output_path)
+            recorder = AudioRecorder.start_recording(self, output_path,self.config.silence_threshold,self.config.silence_duration)
             
             if not recorder:
                 logger.error("Failed to start recording")

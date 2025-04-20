@@ -55,16 +55,14 @@ if __name__ == "__main__":
     config_path ="../audio_manager.yaml"
     config_manager = Config(config_path=config_path, default_config=default_config, env_prefix='AUDIO_MANAGER_')
     
-    config = config_manager.sip
-
-    # Replace with your Twilio SIP credentials and your server's IP address
+    config = config_manager.sip_manager
 
     
     try:
         # Create and start SIP agent
         agent = SipAgent(config)
         agent.test_audio_routing()
-        configure_audio(agent)
+#        configure_audio(agent)
         agent.register_account()
         agent.start()
     except Exception as e:

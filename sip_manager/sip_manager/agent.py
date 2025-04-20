@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class SipAgent:
     def __init__(self, config=None):
         # Create endpoint
-        self.ep = CustomEndpoint()
+        self.ep = CustomEndpoint(config.silence_check_interval)
         self.account = None
         self.is_running = False
         self.config = config
@@ -127,7 +127,7 @@ class SipAgent:
         
         try:
             # Main loop to keep the application running
-            self.ep.utilTimerSchedule(500, None)
+            self.ep.utilTimerSchedule(self.config.welcome_message_length, None)
 
             while self.is_running:
                 # Handle events with 100ms timeout
