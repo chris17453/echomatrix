@@ -1,7 +1,9 @@
 import os
+import time
 import wave
 import logging
 import pjsua2 as pj
+from .events import emit_event, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,8 @@ class AudioPlayer:
                     logger.info(f"Stopping previous audio player for call {call_id}")
                     player = audio_players[call_id]
                     player.stop()
+                    # Emit audio ended event
+                    emit_event(EventType.AUDIO_ENDED, call_id=call_id)
                     del audio_players[call_id]
                 except Exception as e:
                     logger.warning(f"Error cleaning up previous player: {e}")
@@ -68,10 +72,13 @@ class AudioPlayer:
                 logger.info(f"WAV duration: {duration} seconds")
             
             # Initialize player with the WAV file
-            player.createPlayer(wav_file_path,pj.PJMEDIA_FILE_NO_LOOP)
+            player.createPlayer(wav_file_path, pj.PJMEDIA_FILE_NO_LOOP)
             
             # Store in global dict to prevent garbage collection
             audio_players[call_id] = player
+            # Add file path and duration to player for reference
+            player.file_path = wav_file_path
+            player.duration = duration
             
             # Get the call media
             for mi in call_info.media:
@@ -86,6 +93,16 @@ class AudioPlayer:
                     
                     logger.info(f"Started playing {wav_file_path} to call {call_id}")
                     
+                    # Emit audio playing event
+                    emit_event(EventType.AUDIO_PLAYING, 
+                              call_id=call_id,
+                              file_path=wav_file_path,
+                              duration=duration)
+                    
+                    # Schedule a timer to emit audio ended event when playback completes
+                    # Since we don't have direct callbacks from PJSUA for playback completion,
+                    # we can check the status in the endpoint timer
+                    
                     return True
                     
             logger.warning("No active audio media found in call")
@@ -95,4 +112,32 @@ class AudioPlayer:
             logger.error(f"Error playing WAV file: {e}")
             return False
             
-            
+    @staticmethod
+    def check_audio_players():
+        """
+        Check if any audio players have finished playback.
+        This should be called periodically from the SIP agent's timer.
+        """
+        try:
+            current_time = time.time()
+            for call_id in list(audio_players.keys()):
+                try:
+                    player = audio_players[call_id]
+                    # Check if the player has finished
+                    if hasattr(player, 'start_time') and hasattr(player, 'duration'):
+                        elapsed = current_time - player.start_time
+                        if elapsed >= player.duration:
+                            # Playback finished
+                            logger.info(f"Audio playback finished for call {call_id}")
+                            # Emit audio ended event
+                            emit_event(EventType.AUDIO_ENDED, 
+                                      call_id=call_id,
+                                      file_path=player.file_path,
+                                      duration=player.duration)
+                            # Cleanup
+                            player.stop()
+                            del audio_players[call_id]
+                except Exception as e:
+                    logger.error(f"Error checking audio player for call {call_id}: {e}")
+        except Exception as e:
+            logger.error(f"Error in check_audio_players: {e}")

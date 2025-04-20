@@ -4,6 +4,8 @@ import wave
 import logging
 import pjsua2 as pj
 import numpy as np
+from .events import emit_event, EventType
+
 
 logger = logging.getLogger(__name__)
 audio_recorders = {}
@@ -212,6 +214,11 @@ class AudioRecorder:
                             recorder.speech_segments.append(speech_segment)
                             logger.info(f"[check_for_silence] SPEECH SEGMENT RECORDED: {speech_segment['start_ms']} to {speech_segment['end_ms']} ({speech_segment['duration_ms']}ms), PCM bytes: {speech_segment['pcm_start_byte']} to {speech_segment['pcm_end_byte']}")
                             
+                            # Emit speech segment complete event
+                            emit_event(EventType.SPEECH_SEGMENT_COMPLETE, 
+                                    call_id=call_id, 
+                                    segment=speech_segment)
+
                             # Reset speech tracking
                             recorder.current_speech_start_ms = None
                         
@@ -230,6 +237,12 @@ class AudioRecorder:
                         if not recorder.silence_detected:
                             recorder.silence_detected = True
                             logger.info(f"BEGIN SILENCE EVENT (RMS: {rms:.2f}) for call {call_id}")
+                            # Emit silence detected event
+                            emit_event(EventType.SILENCE_DETECTED, 
+                                    call_id=call_id, 
+                                    duration=silence_duration,
+                                    rms=rms)
+
                             if on_silence_callback:
                                 on_silence_callback(call_id, silence_duration)
                         return True, silence_duration
@@ -240,6 +253,11 @@ class AudioRecorder:
                         silence_duration = silence_duration_ms / 1000.0  # For logging in seconds
                         logger.info(f"[check_for_silence] SILENCE ENDED AFTER: {silence_duration:.2f}s ({silence_duration_ms}ms)")
                         
+                        # Emit silence ended event
+                        emit_event(EventType.SILENCE_ENDED, 
+                                call_id=call_id, 
+                                duration=silence_duration)
+
                         # Reset silence tracking
                         if on_silence_end_callback:
                             on_silence_end_callback(call_id, silence_duration)
@@ -249,6 +267,11 @@ class AudioRecorder:
                         recorder.current_speech_start_ms = current_ms
                         logger.info(f"[check_for_silence] NEW SPEECH SEGMENT STARTED AT: {recorder.current_speech_start_ms}ms")
                     
+                        # Emit speech detected event
+                        emit_event(EventType.SPEECH_DETECTED, 
+                                call_id=call_id,
+                                start_ms=recorder.current_speech_start_ms)
+
                     # Reset silence tracking
                     recorder.silence_start_time_ms = None
                     recorder.silent_period = 0

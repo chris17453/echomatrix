@@ -6,81 +6,72 @@ from .account import Account
 from .recorder import audio_recorders
 from .endpoint import CustomEndpoint
 
-
 logger = logging.getLogger(__name__)
 
 class SipAgent:
     def __init__(self, config=None):
-        # Create endpoint
-        self.ep = CustomEndpoint(config.silence_check_interval)
         self.account = None
-        self.is_running = False
+        self.running = False
         self.config = config
-        
+            
+        # Create endpoint
+        self.ep = CustomEndpoint(self.config.silence_check_interval)
+
         # Initialize logging
         ep_cfg = pj.EpConfig()
-        ep_cfg.logConfig.level = self.config.log_level  # More verbose logging
-        
-        # Configure media with NAT settings
-        ep_cfg.medConfig.noVad = self.config.noVad
+        ep_cfg.logConfig.level = self.config.log_level
 
-        ep_cfg.medConfig.ecTailLen = self.config.ecTailLen
-
-        ep_cfg.medConfig.clockRate = self.config.clockRate
-        ep_cfg.medConfig.sndClockRate = self.config.sndClockRate
-
+        # Media configuration
+        ep_cfg.medConfig.noVad = self.config.no_vad
+        ep_cfg.medConfig.ecTailLen = self.config.ec_tail_len
+        ep_cfg.medConfig.clockRate = self.config.clock_rate
+        ep_cfg.medConfig.sndClockRate = self.config.snd_clock_rate
         ep_cfg.medConfig.quality = self.config.quality
         ep_cfg.medConfig.ptime = self.config.ptime
-        ep_cfg.medConfig.channelCount = self.config.channelCount
+        ep_cfg.medConfig.channelCount = self.config.channel_count
         ep_cfg.medConfig.ec_options = self.config.ec_options
-        ep_cfg.medConfig.txDropPct = self.config.txDropPct
-        
-        # Create a StringVector for STUN servers
-        stun_servers = pj.StringVector(["stun.l.google.com:19302"])
+        ep_cfg.medConfig.txDropPct = self.config.tx_drop_pct
+
+        # Threading
+        ep_cfg.uaConfig.mainThreadOnly = self.config.main_thread_only
+        ep_cfg.uaConfig.threadCnt = self.config.thread_count
+
+        # NAT and STUN
+        stun_servers = pj.StringVector( [ self.config.stun_server ] )
         ep_cfg.uaConfig.stunServer = stun_servers
-        
-        # Set NAT keep-alive interval (in seconds)
-        ep_cfg.uaConfig.natKeepAliveInterval = 30
+        ep_cfg.uaConfig.natKeepAliveInterval = self.config.nat_keep_alive_interval
+        ep_cfg.uaConfig.natTypeInSdp = self.config.nat_type_in_sdp
 
-        # Configure media config for NAT handling
-        ep_cfg.medConfig.enableIce = True  # Enable ICE
-        ep_cfg.medConfig.enableRtcp = True  # Enable RTCP
-        ep_cfg.medConfig.enableSrtp = pj.PJMEDIA_SRTP_OPTIONAL  # Optional SRTP
+        # Enable media features
+        ep_cfg.medConfig.enableIce = True
+        ep_cfg.medConfig.enableRtcp = True
+        ep_cfg.medConfig.enableSrtp = pj.PJMEDIA_SRTP_OPTIONAL
 
 
-        # Enable ICE for NAT traversal
-#        ep_cfg.uaConfig.natTypeInSdp = self.config.natTypInSdp
-        ep_cfg.uaConfig.natTypeInSdp = 4
-
-        # Create endpoint
+        # Init endpoint
         self.ep.libCreate()
         self.ep.libInit(ep_cfg)
         
         
-        # Create transport with public IP
+        # Transport configuration
         transport_cfg = pj.TransportConfig()
         transport_cfg.port = self.config.public_port
-        
         transport_cfg.publicAddress = self.config.public_ip
-        transport_cfg.boundAddress = "0.0.0.0"  # Bind to all interfaces
+        transport_cfg.boundAddress = self.config.bound_address
 
         logger.info(f"Using public IP: {self.config.public_ip}")
-        
+
         self.transport = self.ep.transportCreate(pj.PJSIP_TRANSPORT_UDP, transport_cfg)
-        
-        # Start the endpoint
+
         self.ep.libStart()
-        
-        # Set NULL device
         self.ep.audDevManager().setNullDev()
-        
+
         # Set codec priorities
-        self.ep.codecSetPriority("PCMU/8000", 255)
-        self.ep.codecSetPriority("PCMA/8000", 254)
-        
+        self.ep.codecSetPriority(self.config.pcmu_codec, self.config.pcmu_priority)
+        self.ep.codecSetPriority(self.config.pcma_codec, self.config.pcma_priority)
+
         logger.info("SIP endpoint started with NULL audio device")
 
-        # Instance variable
         pj.Endpoint.instance()
             
     def register_account(self):
@@ -122,7 +113,7 @@ class SipAgent:
         logger.info(f"SIP account created: {acc_cfg.idUri}")
 
     def start(self):
-        self.is_running = True
+        self.running = True
         logger.info("SIP agent started and ready to receive calls")
         
         try:
