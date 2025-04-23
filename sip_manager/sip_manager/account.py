@@ -38,15 +38,15 @@ class Account(pj.Account):
         except Exception as e:
             logger.error(f"Error in onIncomingCall: {e}")
         
-    def play_wav_to_call(self, wav_file_path, call=None):
+    def play_wav_to_call(self, wav_file_path, call_id=None):
         """
         Play a WAV file to a specific call or the first active call
         
         Args:
             wav_file_path: Path to the WAV file
-            call: Specific call object to play to (optional)
+            call_id: Specific call identifier to play to 
             
         Returns:
             bool: Success or failure
         """
-        return AudioPlayer.play_wav_to_call(self, wav_file_path, call)  
+        return AudioPlayer.play_wav_to_call(self, wav_file_path, call_id=call_id)  

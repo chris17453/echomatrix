@@ -20,6 +20,7 @@ class AudioRecorder:
             call_id = call_info.callIdString
             logger.info(f"Setting up recording for call {call_id}")
             recorder = pj.AudioMediaRecorder()
+            recorder.call_id                = call_info.callIdString
             recorder.output_path            = output_path
             recorder.last_size              = 0
             recorder.last_check_time        = time.time()
@@ -49,6 +50,8 @@ class AudioRecorder:
                         audio_media = call.getAudioMedia(media.index)
                         recorder.audio_media = audio_media
                         audio_media.startTransmit(recorder)
+                        emit_event(EventType.RECORDING_STARTED, call_id=recorder.call_id,output_path=output_path)
+
                         logger.info("Connected audio to recorder")
                         break
                     except Exception as e:
@@ -67,6 +70,7 @@ class AudioRecorder:
             if hasattr(recorder, 'audio_media'):
                 recorder.audio_media.stopTransmit(recorder)
                 logger.info(f"Paused recording: {recorder.output_path}")
+                emit_event(EventType.RECORDING_PAUSED, call_id=recorder.call_id,output_path=recorder.output_path)
                 return True
         except Exception as e:
             logger.warning(f"Pause failed: {e}")
@@ -78,6 +82,7 @@ class AudioRecorder:
             if hasattr(recorder, 'audio_media'):
                 recorder.audio_media.startTransmit(recorder)
                 logger.info(f"Resumed recording: {recorder.output_path}")
+                emit_event(EventType.RECORDING_RESUMED, call_id=recorder.call_id,output_path=recorder.output_path)
                 return True
         except Exception as e:
             logger.warning(f"Resume failed: {e}")
@@ -96,6 +101,7 @@ class AudioRecorder:
             logger.info(f"Stopping recording for call {call_id}")
             if hasattr(recorder, 'audio_media'):
                 recorder.audio_media.stopTransmit(recorder)
+                emit_event(EventType.RECORDING_STOPPED, call_id=recorder.call_id,output_path=output_path)
 
             try:
                 if hasattr(recorder, 'close'):
@@ -170,8 +176,8 @@ class AudioRecorder:
         current_ms = int((current_time - recorder.recording_start_time) * 1000)
 
         try:
-            if current_time - recorder.last_check_time < 0.5:
-                return False, 0
+            #if current_time - recorder.last_check_time < 0.5:
+            #    return False, 0
             recorder.last_check_time = current_time
 
             if not os.path.exists(recorder.output_path):
@@ -202,6 +208,7 @@ class AudioRecorder:
                         # If we were in speech before, record the speech segment
                         if recorder.current_speech_start_ms is not None:
                             speech_segment = {
+                                'audio_path': recorder.output_path,
                                 'start_ms': recorder.current_speech_start_ms,
                                 'end_ms': current_ms,
                                 'duration_ms': current_ms - recorder.current_speech_start_ms,

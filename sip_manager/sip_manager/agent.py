@@ -2,6 +2,8 @@ import os
 import time
 import logging
 import pjsua2 as pj
+import queue
+from .events import emit_event, EventType
 from .account import Account
 from .recorder import audio_recorders
 from .endpoint import CustomEndpoint
@@ -13,6 +15,7 @@ class SipAgent:
         self.account = None
         self.running = False
         self.config = config
+        self.audio_command_queue = queue.Queue()
             
         # Create endpoint
         self.ep = CustomEndpoint(self.config.silence_check_interval)
@@ -23,14 +26,16 @@ class SipAgent:
 
         # Media configuration
         ep_cfg.medConfig.noVad = self.config.no_vad
-        ep_cfg.medConfig.ecTailLen = self.config.ec_tail_len
         ep_cfg.medConfig.clockRate = self.config.clock_rate
         ep_cfg.medConfig.sndClockRate = self.config.snd_clock_rate
         ep_cfg.medConfig.quality = self.config.quality
         ep_cfg.medConfig.ptime = self.config.ptime
         ep_cfg.medConfig.channelCount = self.config.channel_count
-        ep_cfg.medConfig.ec_options = self.config.ec_options
         ep_cfg.medConfig.txDropPct = self.config.tx_drop_pct
+        ep_cfg.medConfig.ecTailLen = self.config.ec_tail_len
+        ep_cfg.medConfig.ec_options = self.config.ec_options
+        ep_cfg.medConfig.ecEnabled = self.config.echo_cancelation
+        
 
         # Threading
         ep_cfg.uaConfig.mainThreadOnly = self.config.main_thread_only
@@ -110,6 +115,9 @@ class SipAgent:
         # Create the account
         self.account = Account(self.config)
         self.account.create(acc_cfg)
+
+        emit_event(EventType.ACCOUNT_REGISTERED, account_uri=acc_cfg.idUri,registrar=acc_cfg.regConfig.registrarUri)
+
         logger.info(f"SIP account created: {acc_cfg.idUri}")
 
     def start(self):
@@ -152,7 +160,7 @@ class SipAgent:
             
         logger.info("SIP agent stopped")
     
-    def play_wav_to_call(self, wav_file_path):
+    def play_wav_to_call(self, wav_file_path,call_id=None):
         """
         Play a WAV file to the current active call
         
@@ -163,47 +171,36 @@ class SipAgent:
             bool: True if successful, False otherwise
         """
         if self.account and self.account.calls:
-            return self.account.play_wav_to_call(wav_file_path)
+            return self.account.play_wav_to_call(wav_file_path,call_id)
+            
         else:
             logger.warning("No active account or calls to play audio to")
             return False
                     
-
-    def test_audio_routing(self):
-        """Test if audio is properly routed in the endpoint"""
+    def process_audio_queue(self):
+        """Process any pending audio playback commands"""
         try:
-            # Log audio devices
-            logger.info("Testing audio routing")
-            
-            # Get audio device manager
-            adm = self.ep.audDevManager()
-            
-            # Check sound devices
-            dev_info = adm.getDevInfo()
-            logger.info(f"Sound devices: input={dev_info.inputCount}, output={dev_info.outputCount}")
-            
-            # Test if null device is active
-            try:
-                cap_dev = adm.getCaptureDevMedia()
-                play_dev = adm.getPlaybackDevMedia()
-                logger.info("Successfully got capture and playback devices")
-            except Exception as e:
-                logger.error(f"Failed to get media devices: {e}")
-                
-            # Check codecs
-            codecs = []
-            try:
-                for i in range(128):  # arbitrary limit
-                    try:
-                        codec_info = self.ep.codecEnum(i)
-                        codecs.append(codec_info.codecId)
-                    except:
-                        break
-                logger.info(f"Available codecs: {', '.join(codecs)}")
-            except Exception as e:
-                logger.error(f"Error enumerating codecs: {e}")
-                
-            return True
+            # Only try to get a command if the queue isn't empty
+            if not self.audio_command_queue.empty():
+                cmd = self.audio_command_queue.get_nowait()
+                if cmd.get('type') == 'play_wav':
+                    file_path = cmd.get('file_path')
+                    call_id = cmd.get('call_id')
+                    logger.info(f"Processing audio command to play {file_path} on call {call_id}")
+                    if self.account and file_path and call_id:
+                        success = self.account.play_wav_to_call(file_path, call_id)
+                        logger.info(f"Audio command processed successfully: {success}")
+                        # Mark the task as done
+                        self.audio_command_queue.task_done()
+                        return success
+                # Mark the task as done even if we couldn't process it
+                self.audio_command_queue.task_done()
+        except queue.Empty:
+            # Queue was empty - this is normal, not an error
+            pass
         except Exception as e:
-            logger.error(f"Error testing audio: {e}")
-            return False                
+            logger.error(f"Error processing audio queue: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
+        return False

@@ -22,11 +22,9 @@ from .db import Database, AIIdentityRecord, UserIdentityRecord, FileRecord, Reco
 logger = logging.getLogger(__name__)
 
 class AudioManager:
-    def __init__(self, config_path="audio_manager.yaml"):
-        self.config_manager = Config(config_path=config_path, default_config=default_config, env_prefix='AUDIO_MANAGER_')
-        
+    def __init__(self, config):
         # Access config via dot notation
-        self.config = self.config_manager.audio_manager
+        self.config = config
 
         self.db = Database(self.config.db_path)
         self.file_manager = FileManager()
@@ -658,3 +656,125 @@ class AudioManager:
                 setattr(recording, key, value)
                 
         return recording.update(self.db)
+
+    def transcribe_segment(self, file_path, speech_segment):
+        """
+        Extract an audio segment and transcribe it.
+        
+        Args:
+            file_path: Path to the PCM audio file
+            speech_segment: Dictionary containing segment metadata with keys:
+                - pcm_start_byte: Starting byte position in the file
+                - pcm_end_byte: Ending byte position in the file
+                - duration_ms: Optional duration in milliseconds
+                - start_ms: Optional start time in milliseconds
+                - end_ms: Optional end time in milliseconds
+                
+        Returns:
+            str or None: Transcribed text, or None on failure
+        """
+        try:
+            from .transcriber import transcribe_segment
+            
+            # Check if file exists
+            if not os.path.exists(file_path):
+                logger.error(f"Audio file not found: {file_path}")
+                return None
+                
+            # Transcribe the segment
+            transcription = transcribe_segment(
+                file_path=file_path,
+                speech_segment=speech_segment,
+                config=self.config
+            )
+            
+            if not transcription:
+                logger.error("Segment transcription failed")
+                return None
+                
+            logger.info(f"Segment transcription completed: {transcription}")
+            return transcription
+            
+        except Exception as e:
+            logger.error(f"Error in transcribe_segment: {e}")
+            return None        
+
+    def analyze_pcm_audio_level(self, file_path, sample_rate=8000, sample_width=2, sample_duration=1.0):
+        """
+        Analyze the audio level of a PCM file.
+        
+        Args:
+            file_path: Path to the PCM audio file
+            sample_rate: Sample rate in Hz (default: 8000)
+            sample_width: Sample width in bytes (default: 2)
+            sample_duration: Duration to analyze in seconds (default: 1.0)
+                
+        Returns:
+            float: RMS audio level or 0 on failure
+        """
+        try:
+            from .sound import analyze_pcm_audio_level
+            
+            # Verify file exists
+            if not os.path.exists(file_path):
+                logger.error(f"PCM file not found: {file_path}")
+                return 0
+                
+            # Analyze the audio level
+            result = analyze_pcm_audio_level(
+                file_path=file_path,
+                sample_rate=sample_rate,
+                sample_width=sample_width,
+                sample_duration=sample_duration
+            )
+            
+            logger.info(f"Audio level analysis completed for {file_path}: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in analyze_pcm_audio_level: {e}")
+            return 0
+
+    def extract_audio_segment(self, file_path, speech_segment, sample_rate=8000, sample_width=2):
+        """
+        Extract an audio segment from a PCM file based on segment metadata.
+        
+        Args:
+            file_path: Path to the PCM audio file
+            speech_segment: Dictionary containing segment metadata with keys:
+                - pcm_start_byte: Starting byte position in the file
+                - pcm_end_byte: Ending byte position in the file
+            sample_rate: Sample rate of the audio (default: 8000 Hz)
+            sample_width: Sample width in bytes (default: 2 bytes/sample)
+                
+        Returns:
+            tuple: (audio_data, segment_info) or (None, None) on failure
+                - audio_data: Binary data of the extracted segment
+                - segment_info: Dictionary with metadata about the extracted segment
+        """
+        try:
+            from .sound import extract_audio_segment
+            
+            # Verify file exists
+            if not os.path.exists(file_path):
+                logger.error(f"PCM file not found: {file_path}")
+                return None, None
+                
+            # Extract the audio segment
+            audio_data, segment_info = extract_audio_segment(
+                file_path=file_path,
+                speech_segment=speech_segment,
+                sample_rate=sample_rate,
+                sample_width=sample_width
+            )
+            
+            if audio_data is None:
+                logger.error(f"Failed to extract audio segment from {file_path}")
+                return None, None
+                
+            logger.info(f"Audio segment extracted from {file_path}: {segment_info}")
+            return audio_data, segment_info
+            
+        except Exception as e:
+            logger.error(f"Error in extract_audio_segment: {e}")
+            return None, None            

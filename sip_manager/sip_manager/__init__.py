@@ -5,6 +5,7 @@ from .agent import SipAgent
 import threading
 import logging
 import time
+import queue
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,9 @@ def create_agent(config, agent_id=None):
     
     # Enhance the agent with event methods
     from .events import register_listener, unregister_listener, EventType, emit_event
-    
+
+    audio_command_queue = queue.Queue()
+
     # Use a shared Event object instead of thread_local
     agent_running = threading.Event()
     agent_initialized = threading.Event()
@@ -51,13 +54,15 @@ def create_agent(config, agent_id=None):
                 kwargs['agent_id'] = agent.id
                 return emit_event(event_type, **kwargs)
             
+ 
+                        
+
             agent.register_event = register_namespaced_event
             agent.unregister_event = unregister_listener
             agent.emit_event = emit_namespaced_event
             agent.EventType = EventType
             
             # Initialize account and other components
-            agent.test_audio_routing()
             agent.register_account()
             
             # Signal that the agent is initialized
@@ -71,11 +76,15 @@ def create_agent(config, agent_id=None):
             
             agent.ep.utilTimerSchedule(config.welcome_message_length, None)
 
-            # Main event loop - handle PJSIP events
+  
+            # In the main loop, add queue processing:
             while agent_running.is_set():
+                # Process any pending audio commands
+                agent.process_audio_queue()
+                
                 event_count = agent.ep.libHandleEvents(100)
                 time.sleep(0.01)  # Small sleep to prevent CPU hogging
-            
+                        
             # Cleanup
             logger.info(f"Shutting down agent {agent.id}")
             if hasattr(agent, 'account') and agent.account:
@@ -165,5 +174,43 @@ def create_agent(config, agent_id=None):
             """Emit an event"""
             kwargs['agent_id'] = self.id
             return emit_event(event_type, **kwargs)
+                
     
+        def play_wav_to_call(self, file_path, call_id):
+            """
+            Queue a WAV file to play on a specific call
+            
+            Args:
+                file_path: Path to the WAV file
+                call_id: ID of the call to play the file on
+            
+            Returns:
+                bool: True if successfully queued, False otherwise
+            """
+            if not self.is_running():
+                logger.error("Agent not running, cannot play WAV file")
+                return False
+                    
+            if not agent_object[0]:
+                logger.error("Agent not initialized, cannot play WAV file")
+                return False
+            
+            try:
+                logger.info(f"Queueing WAV file {file_path} for call {call_id}")
+                
+                # Access the agent's queue directly
+                agent_object[0].audio_command_queue.put({
+                    'type': 'play_wav',
+                    'file_path': file_path,
+                    'call_id': call_id,
+                    'timestamp': time.time()
+                })
+                
+                logger.info(f"Successfully queued audio playback request")
+                return True
+            except Exception as e:
+                logger.error(f"Error queueing WAV file: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                return False
     return AgentWrapper()

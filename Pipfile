@@ -11,13 +11,13 @@ websockets = "*"
 openai = "*"
 soundfile = "*"
 pydub = "*"
-pyyaml = "*"
 python-dotenv = "*"
 pysip = "*"
 boto3 = "*"
 paramiko = "*"
 click = "*"
 pytest = "*"
+pyyaml = "*"
 
 [dev-packages]
 

@@ -1,3 +1,4 @@
+import os
 import logging
 import threading
 import time
@@ -9,7 +10,6 @@ class EventType:
     CALL_DISCONNECTED = "call_disconnected"
     SILENCE_DETECTED = "silence_detected"
     SILENCE_ENDED = "silence_ended"
-    NEW_SEGMENT = "new_segment"
     SPEECH_DETECTED = "speech_detected"
     SPEECH_SEGMENT_COMPLETE = "speech_segment_complete"
     AUDIO_PLAYING = "audio_playing"

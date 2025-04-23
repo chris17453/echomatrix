@@ -13,15 +13,16 @@ audio_players = {}
 
 class AudioPlayer:
     @staticmethod
-    def play_wav_to_call(account, wav_file_path, call=None):
+    def play_wav_to_call(account, wav_file_path, call_id=None):
         """
-        Play a WAV file through a specific SIP call or the first active call.
+        Play a WAV file through a specific SIP call.
         
         Args:
             account: The SIP account with active calls
             wav_file_path: Path to the WAV file to play
-            call: Specific call to play audio to (optional)
-            
+            call: Specific call object to play audio to (optional)
+            call_id: ID of the call to play audio to (optional)
+                
         Returns:
             bool: True if successful, False otherwise
         """
@@ -30,17 +31,25 @@ class AudioPlayer:
             if not os.path.exists(wav_file_path):
                 logger.error(f"WAV file not found: {wav_file_path}")
                 return False
-            # Use provided call or check for active calls
-            if call:
-                selected_call = call
+                
+            # Find the call by ID if provided
+            selected_call = None
+            if call_id:
+                # Find call by ID in the account's calls
+                for c in account.calls:
+                    if c.getInfo().callIdString == call_id:
+                        selected_call = c
+                        break
+                if not selected_call:
+                    logger.warning(f"Call with ID {call_id} not found")
+                    return False
             elif account.calls:
+                # Fallback to first call if no specific call requested
                 selected_call = account.calls[0]
             else:
                 logger.warning("No active calls to play audio to")
                 return False
                 
-            # Get call info
-            call_id = selected_call.getInfo().callIdString
             
             # Get call info to confirm we're connected
             call_info = selected_call.getInfo()
