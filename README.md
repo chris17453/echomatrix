@@ -1,7 +1,7 @@
 # echomatrix
 
 
-Voice-driven AI IVR system using, OpenAI APIs. No migdleman (freepbx/asterisk)
+Voice-driven AI IVR system using, OpenAI APIs. No midleman (freepbx/asterisk)
 
 ## 🔧 Features
 
