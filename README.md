@@ -8,7 +8,7 @@ Voice-driven AI IVR system using, OpenAI APIs. No midleman (freepbx/asterisk)
 - Whisper for speech-to-text
 - GPT-4 Turbo for smart responses
 - OpenAI TTS for fast, high-quality voice replies
-- Modular Python design with AGI integration
+- Modular Python design (Each component it its own module)
 
 ## 🚀 Setup
 
