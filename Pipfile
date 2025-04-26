@@ -4,7 +4,6 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-numpy = "*"
 ari = "*"
 aiohttp = "*"
 websockets = "*"
@@ -17,7 +16,11 @@ boto3 = "*"
 paramiko = "*"
 click = "*"
 pytest = "*"
+scipy = "*"
 pyyaml = "*"
+numpy = "*"
+faiss-cpu = "*"
+sentence-transformers = "*"
 
 [dev-packages]
 
