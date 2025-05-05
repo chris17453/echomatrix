@@ -21,6 +21,7 @@ pyyaml = "*"
 numpy = "*"
 faiss-cpu = "*"
 sentence-transformers = "*"
+huggingface-hub = {extras = ["hf_xet"], version = "*"}
 
 [dev-packages]
 
